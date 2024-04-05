@@ -923,6 +923,8 @@ fn CompactionPipelineType(comptime Forest: type, comptime Grid: type) type {
 
             const source_index_block_a = self.block_pool.pop().?;
             const source_index_block_b = self.block_pool.pop().?;
+            source_index_block_a.stage = .standalone;
+            source_index_block_b.stage = .standalone;
 
             // Split the remaining blocks equally, with the remainder going to the target pool.
             // TODO: Splitting equally is definitely not the best way!
@@ -1033,6 +1035,8 @@ fn CompactionPipelineType(comptime Forest: type, comptime Grid: type) type {
                     );
 
                     const immutable_table_a_block = self.block_pool.pop().?;
+                    immutable_table_a_block.stage = .standalone;
+
                     const target_index_blocks = CompactionHelper.BlockFIFO.init(
                         &self.block_pool,
                         2,

@@ -324,11 +324,18 @@ fn EnvironmentType(comptime table_usage: TableUsage) type {
                     continue;
                 }
                 const source_a_immutable_block = env.block_pool.pop().?;
+                source_a_immutable_block.stage = .standalone;
+
                 const target_index_blocks = CompactionHelper.BlockFIFO.init(&env.block_pool, 2);
 
+                const source_index_block_a = env.block_pool.pop().?;
+                const source_index_block_b = env.block_pool.pop().?;
+                source_index_block_a.stage = .standalone;
+                source_index_block_b.stage = .standalone;
+
                 const beat_blocks = .{
-                    .source_index_block_a = env.block_pool.pop().?,
-                    .source_index_block_b = env.block_pool.pop().?,
+                    .source_index_block_a = source_index_block_a,
+                    .source_index_block_b = source_index_block_b,
                     .source_value_blocks = .{
                         CompactionHelper.BlockFIFO.init(&env.block_pool, 2),
                         CompactionHelper.BlockFIFO.init(&env.block_pool, 2),
