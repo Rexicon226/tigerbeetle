@@ -730,6 +730,12 @@ fn MessageBusType(comptime process_type: vsr.ProcessType) type {
                 @memcpy(mem.asBytes(&header), data[0..@sizeOf(Header)]);
 
                 if (!connection.recv_checked_header) {
+                    if (header.command == .reserved) {
+                        log.err("reserved command received from {}", .{connection.peer});
+                        connection.terminate(bus, .shutdown);
+                        return null;
+                    }
+
                     if (!header.valid_checksum()) {
                         log.err("invalid header checksum received from {}", .{connection.peer});
                         connection.terminate(bus, .shutdown);
@@ -837,6 +843,8 @@ fn MessageBusType(comptime process_type: vsr.ProcessType) type {
                 header: *const Header,
             ) bool {
                 comptime assert(process_type == .replica);
+
+                assert(header.command != .reserved);
 
                 assert(bus.cluster == header.cluster);
                 assert(bus.connections_used > 0);
