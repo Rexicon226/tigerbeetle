@@ -178,7 +178,7 @@ pub fn ScanMergeUnionType(
         }
 
         fn scan_read_callback(context: *Scan.Context, scan: *Scan) void {
-            const self: *ScanMergeUnion = @fieldParentPtr(ScanMergeUnion, "scan_context", context);
+            const self: *ScanMergeUnion = @fieldParentPtr("scan_context", context);
             assert(self.state == .buffering);
             assert(self.state.buffering.pending_count > 0);
             assert(self.state.buffering.pending_count <= self.streams.count());

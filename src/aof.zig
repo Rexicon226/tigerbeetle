@@ -1,6 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const os = std.os;
+const posix = std.posix;
 
 const constants = @import("constants.zig");
 const vsr = @import("vsr.zig");
@@ -117,7 +118,7 @@ pub const AOFEntry = extern struct {
 /// CLI command does it by hashing together all checksum_body, operation and timestamp
 /// fields.
 pub const AOF = struct {
-    fd: os.fd_t,
+    fd: posix.fd_t,
     last_checksum: ?u128 = null,
 
     /// Create an AOF given an absolute path. Handles opening the
@@ -133,7 +134,7 @@ pub const AOF = struct {
         return AOF.init(dir_fd, basename);
     }
 
-    fn init(dir_fd: os.fd_t, relative_path: []const u8) !AOF {
+    fn init(dir_fd: posix.fd_t, relative_path: []const u8) !AOF {
         const fd = try IO.open_file(dir_fd, relative_path, 0, .create_or_open, .direct_io_required);
         errdefer os.close(fd);
 
@@ -710,8 +711,8 @@ pub fn main() !void {
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
-            std.io.getStdOut().writeAll(usage) catch os.exit(1);
-            os.exit(0);
+            std.io.getStdOut().writeAll(usage) catch posix.exit(1);
+            posix.exit(0);
         }
 
         if (count == 1) {
@@ -768,7 +769,7 @@ pub fn main() !void {
     } else if (action != null and std.mem.eql(u8, action.?, "merge") and count >= 2) {
         try aof_merge(allocator, paths[0 .. count - 2], "prepared.aof");
     } else {
-        std.io.getStdOut().writeAll(usage) catch os.exit(1);
-        os.exit(1);
+        std.io.getStdOut().writeAll(usage) catch posix.exit(1);
+        posix.exit(1);
     }
 }

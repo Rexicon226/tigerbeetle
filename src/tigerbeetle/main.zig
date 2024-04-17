@@ -4,6 +4,7 @@ const assert = std.debug.assert;
 const fmt = std.fmt;
 const mem = std.mem;
 const os = std.os;
+const posix = std.posix;
 const log_main = std.log.scoped(.main);
 
 const vsr = @import("vsr");
@@ -31,9 +32,9 @@ const SuperBlock = vsr.SuperBlockType(Storage);
 const superblock_zone_size = vsr.superblock.superblock_zone_size;
 const data_file_size_min = vsr.superblock.data_file_size_min;
 
-pub const std_options = struct {
-    pub const log_level: std.log.Level = constants.log_level;
-    pub const logFn = constants.log;
+pub const std_options: std.Options = .{
+    .log_level = constants.log_level,
+    .logFn = constants.log,
 };
 
 pub fn main() !void {
@@ -76,8 +77,8 @@ pub fn main() !void {
 }
 
 const Command = struct {
-    dir_fd: os.fd_t,
-    fd: os.fd_t,
+    dir_fd: posix.fd_t,
+    fd: posix.fd_t,
     io: IO,
     storage: Storage,
     message_pool: MessagePool,

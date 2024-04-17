@@ -45,7 +45,7 @@ const assert = std.debug.assert;
 pub fn fatal(comptime fmt_string: []const u8, args: anytype) noreturn {
     const stderr = std.io.getStdErr().writer();
     stderr.print("error: " ++ fmt_string ++ "\n", args) catch {};
-    std.os.exit(1);
+    std.posix.exit(1);
 }
 
 /// Parse CLI arguments for subcommands specified as Zig `struct` or `union(enum)`:
@@ -93,8 +93,8 @@ fn parse_commands(args: *std.process.ArgIterator, comptime Commands: type) Comma
     // NB: help must be declared as *pub* const to be visible here.
     if (@hasDecl(Commands, "help")) {
         if (std.mem.eql(u8, first_arg, "-h") or std.mem.eql(u8, first_arg, "--help")) {
-            std.io.getStdOut().writeAll(Commands.help) catch std.os.exit(1);
-            std.os.exit(0);
+            std.io.getStdOut().writeAll(Commands.help) catch std.posix.exit(1);
+            std.posix.exit(0);
         }
     }
 
@@ -640,7 +640,7 @@ test "flags" {
             { // Compile this file as an executable!
                 const this_file = try std.fs.cwd().realpath(@src().file, flags_exe_buf);
                 const argv = [_][]const u8{ zig_exe, "build-exe", this_file };
-                const exec_result = try std.ChildProcess.exec(.{
+                const exec_result = try std.ChildProcess.run(.{
                     .allocator = gpa,
                     .argv = &argv,
                     .cwd_dir = tmp_dir.dir,
@@ -690,7 +690,7 @@ test "flags" {
                 assert(argv[argv.len - 1].ptr == cli[cli.len - 1].ptr);
             }
 
-            const exec_result = try std.ChildProcess.exec(.{
+            const exec_result = try std.ChildProcess.run(.{
                 .allocator = t.gpa,
                 .argv = argv,
             });

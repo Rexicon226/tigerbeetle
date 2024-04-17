@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const os = std.os;
+const posix = std.posix;
 const assert = std.debug.assert;
 const maybe = stdx.maybe;
 const log = std.log.scoped(.storage);
@@ -24,7 +25,6 @@ pub const Storage = struct {
 
         /// The buffer to read into, re-sliced and re-assigned as we go, e.g. after partial reads.
         buffer: []u8,
-
         /// The position into the file descriptor from where we should read, also adjusted as we go.
         offset: u64,
 
@@ -79,13 +79,13 @@ pub const Storage = struct {
     pub const NextTickSource = enum { lsm, vsr };
 
     io: *IO,
-    fd: os.fd_t,
+    fd: posix.fd_t,
 
     next_tick_queue: FIFO(NextTick) = .{ .name = "storage_next_tick" },
     next_tick_completion_scheduled: bool = false,
     next_tick_completion: IO.Completion = undefined,
 
-    pub fn init(io: *IO, fd: os.fd_t) !Storage {
+    pub fn init(io: *IO, fd: posix.fd_t) !Storage {
         return Storage{
             .io = io,
             .fd = fd,
@@ -220,7 +220,7 @@ pub const Storage = struct {
     }
 
     fn on_read(self: *Storage, completion: *IO.Completion, result: IO.ReadError!usize) void {
-        const read = @fieldParentPtr(Storage.Read, "completion", completion);
+        const read: *Storage.Read = @fieldParentPtr("completion", completion);
 
         const bytes_read = result catch |err| switch (err) {
             error.InputOutput => {
@@ -358,7 +358,7 @@ pub const Storage = struct {
     }
 
     fn on_write(self: *Storage, completion: *IO.Completion, result: IO.WriteError!usize) void {
-        const write = @fieldParentPtr(Storage.Write, "completion", completion);
+        const write: *Storage.Write = @fieldParentPtr("completion", completion);
 
         const bytes_written = result catch |err| switch (err) {
             // We assume that the disk will attempt to reallocate a spare sector for any LSE.

@@ -380,8 +380,8 @@ pub fn StateMachineType(
             ) *StateMachine {
                 comptime assert(field != .null);
 
-                const context = @fieldParentPtr(PrefetchContext, @tagName(field), completion);
-                return @fieldParentPtr(StateMachine, "prefetch_context", context);
+                const context: *PrefetchContext = @fieldParentPtr(@tagName(field), completion);
+                return @fieldParentPtr("prefetch_context", context);
             }
 
             pub fn get(self: *PrefetchContext, comptime field: Field) *FieldType(field) {
@@ -411,8 +411,8 @@ pub fn StateMachineType(
             ) *StateMachine {
                 comptime assert(field != .null);
 
-                const context = @fieldParentPtr(ScanLookup, @tagName(field), completion);
-                return @fieldParentPtr(StateMachine, "scan_lookup", context);
+                const context: *ScanLookup = @fieldParentPtr(@tagName(field), completion);
+                return @fieldParentPtr("scan_lookup", context);
             }
 
             pub fn get(self: *ScanLookup, comptime field: Field) *FieldType(field) {
@@ -526,7 +526,7 @@ pub fn StateMachineType(
         }
 
         fn forest_open_callback(forest: *Forest) void {
-            const self = @fieldParentPtr(StateMachine, "forest", forest);
+            const self: *StateMachine = @fieldParentPtr("forest", forest);
             assert(self.open_callback != null);
 
             const callback = self.open_callback.?;
@@ -984,7 +984,7 @@ pub fn StateMachineType(
         }
 
         fn prefetch_scan_next_tick_callback(completion: *Grid.NextTick) void {
-            const self: *StateMachine = @fieldParentPtr(StateMachine, "scan_next_tick", completion);
+            const self: *StateMachine = @fieldParentPtr("scan_next_tick", completion);
             assert(self.forest.scan_buffer_pool.scan_buffer_used == 0);
             assert(self.scan_lookup == .null);
 
@@ -997,7 +997,7 @@ pub fn StateMachineType(
             assert(self.prefetch_timestamp >= TimestampRange.timestamp_min);
             assert(self.prefetch_timestamp != TimestampRange.timestamp_max);
 
-            var scan_buffer = std.mem.bytesAsSlice(
+            const scan_buffer = std.mem.bytesAsSlice(
                 Transfer,
                 self.scan_buffer[0..@sizeOf(Transfer)],
             );
@@ -1011,7 +1011,7 @@ pub fn StateMachineType(
             // Scanning `Transfers` that _will_ expire, so we can determine the _next_ timestamp
             // it will require to execute `expire_pending_transfers` again.
             // We must do it before scanning for expired transfers to reuse the same buffer.
-            var scan = scan_builder.scan_range(
+            const scan = scan_builder.scan_range(
                 .expires_at,
                 self.forest.scan_buffer_pool.acquire_assume_capacity(),
                 transfers_groove.prefetch_snapshot.?,
@@ -1082,7 +1082,7 @@ pub fn StateMachineType(
             assert(self.prefetch_timestamp < self.expire_pending_transfers_pulse_timestamp or
                 self.expire_pending_transfers_pulse_timestamp == TimestampRange.timestamp_min);
 
-            var scan_buffer = std.mem.bytesAsSlice(
+            const scan_buffer = std.mem.bytesAsSlice(
                 Transfer,
                 self.scan_buffer[0 .. @sizeOf(Transfer) *
                     // We must be constrained to the same limit as `create_transfers`.
@@ -1095,7 +1095,7 @@ pub fn StateMachineType(
 
             // WHERE `expires_at <= prefetch_timestamp`
             // Scanning `Transfers` already expired at `prefetch_timestamp`.
-            var scan = scan_builder.scan_range(
+            const scan = scan_builder.scan_range(
                 .expires_at,
                 self.forest.scan_buffer_pool.acquire_assume_capacity(),
                 transfers_groove.prefetch_snapshot.?,
@@ -1246,7 +1246,7 @@ pub fn StateMachineType(
         }
 
         fn compact_finish(forest: *Forest) void {
-            const self = @fieldParentPtr(StateMachine, "forest", forest);
+            const self: *StateMachine = @fieldParentPtr("forest", forest);
             const callback = self.compact_callback.?;
             self.compact_callback = null;
 
@@ -1267,7 +1267,7 @@ pub fn StateMachineType(
         }
 
         fn checkpoint_finish(forest: *Forest) void {
-            const self = @fieldParentPtr(StateMachine, "forest", forest);
+            const self: *StateMachine = @fieldParentPtr("forest", forest);
             const callback = self.checkpoint_callback.?;
             self.checkpoint_callback = null;
             callback(self);
@@ -2176,7 +2176,7 @@ const TestContext = struct {
     }
 
     fn callback(state_machine: *StateMachine) void {
-        const ctx = @fieldParentPtr(TestContext, "state_machine", state_machine);
+        const ctx: *TestContext = @fieldParentPtr("state_machine", state_machine);
         assert(ctx.busy);
         ctx.busy = false;
     }

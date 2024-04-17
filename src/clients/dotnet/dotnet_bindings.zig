@@ -185,8 +185,8 @@ fn emit_enum(
 ) !void {
     const is_packed_struct = @TypeOf(type_info) == std.builtin.Type.Struct;
     if (is_packed_struct) {
-        assert(type_info.layout == .Packed);
-        // Packed structs represented as Enum needs a Flags attribute:
+        assert(type_info.layout == .@"packed");
+        // @"packed" structs represented as Enum needs a Flags attribute:
         try buffer.writer().print("[Flags]\n", .{});
     }
 
@@ -201,7 +201,7 @@ fn emit_enum(
     });
 
     if (is_packed_struct) {
-        // Packed structs represented as Enum needs a ZERO value:
+        // @"packed" structs represented as Enum needs a ZERO value:
         try buffer.writer().print(
             \\    None = 0,
             \\
@@ -409,15 +409,15 @@ pub fn generate_bindings(buffer: *std.ArrayList(u8)) !void {
 
         switch (@typeInfo(ZigType)) {
             .Struct => |info| switch (info.layout) {
-                .Auto => @compileError("Only packed or extern structs are supported: " ++ @typeName(ZigType)),
-                .Packed => try emit_enum(
+                .auto => @compileError("Only packed or extern structs are supported: " ++ @typeName(ZigType)),
+                .@"packed" => try emit_enum(
                     buffer,
                     ZigType,
                     info,
                     mapping,
                     comptime dotnet_type(std.meta.Int(.unsigned, @bitSizeOf(ZigType))),
                 ),
-                .Extern => try emit_struct(
+                .@"extern" => try emit_struct(
                     buffer,
                     info,
                     mapping,

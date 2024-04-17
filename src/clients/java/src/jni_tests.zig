@@ -662,8 +662,8 @@ test "JNI: Call<Type>Method,CallNonVirtual<Type>Method" {
         const non_virtual_method_id = env.get_method_id(direct_buffer_class, "getShort", "()S");
         try testing.expect(non_virtual_method_id != null);
 
-        const Packed = packed struct { a: u8, b: u8 };
-        const expected: jni.JShort = @bitCast(Packed{
+        const @"packed" = packed struct { a: u8, b: u8 };
+        const expected: jni.JShort = @bitCast(@"packed"{
             .a = element,
             .b = element,
         });
@@ -686,8 +686,8 @@ test "JNI: Call<Type>Method,CallNonVirtual<Type>Method" {
         const non_virtual_method_id = env.get_method_id(direct_buffer_class, "getChar", "()C");
         try testing.expect(non_virtual_method_id != null);
 
-        const Packed = packed struct { a: u8, b: u8 };
-        const expected: jni.JChar = @bitCast(Packed{
+        const @"packed" = packed struct { a: u8, b: u8 };
+        const expected: jni.JChar = @bitCast(@"packed"{
             .a = element,
             .b = element,
         });
@@ -710,8 +710,8 @@ test "JNI: Call<Type>Method,CallNonVirtual<Type>Method" {
         const non_virtual_method_id = env.get_method_id(direct_buffer_class, "getInt", "()I");
         try testing.expect(non_virtual_method_id != null);
 
-        const Packed = packed struct { a: u8, b: u8, c: u8, d: u8 };
-        const expected: jni.JInt = @bitCast(Packed{
+        const @"packed" = packed struct { a: u8, b: u8, c: u8, d: u8 };
+        const expected: jni.JInt = @bitCast(@"packed"{
             .a = element,
             .b = element,
             .c = element,
@@ -736,8 +736,8 @@ test "JNI: Call<Type>Method,CallNonVirtual<Type>Method" {
         const non_virtual_method_id = env.get_method_id(direct_buffer_class, "getLong", "()J");
         try testing.expect(non_virtual_method_id != null);
 
-        const Packed = packed struct { a: u8, b: u8, c: u8, d: u8, e: u8, f: u8, g: u8, h: u8 };
-        const expected: jni.JLong = @bitCast(Packed{
+        const @"packed" = packed struct { a: u8, b: u8, c: u8, d: u8, e: u8, f: u8, g: u8, h: u8 };
+        const expected: jni.JLong = @bitCast(@"packed"{
             .a = element,
             .b = element,
             .c = element,
@@ -766,8 +766,8 @@ test "JNI: Call<Type>Method,CallNonVirtual<Type>Method" {
         const non_virtual_method_id = env.get_method_id(direct_buffer_class, "getFloat", "()F");
         try testing.expect(non_virtual_method_id != null);
 
-        const Packed = packed struct { a: u8, b: u8, c: u8, d: u8 };
-        const expected: jni.JFloat = @bitCast(Packed{
+        const @"packed" = packed struct { a: u8, b: u8, c: u8, d: u8 };
+        const expected: jni.JFloat = @bitCast(@"packed"{
             .a = element,
             .b = element,
             .c = element,
@@ -792,8 +792,8 @@ test "JNI: Call<Type>Method,CallNonVirtual<Type>Method" {
         const non_virtual_method_id = env.get_method_id(direct_buffer_class, "getDouble", "()D");
         try testing.expect(non_virtual_method_id != null);
 
-        const Packed = packed struct { a: u8, b: u8, c: u8, d: u8, e: u8, f: u8, g: u8, h: u8 };
-        const expected: jni.JDouble = @bitCast(Packed{
+        const @"packed" = packed struct { a: u8, b: u8, c: u8, d: u8, e: u8, f: u8, g: u8, h: u8 };
+        const expected: jni.JDouble = @bitCast(@"packed"{
             .a = element,
             .b = element,
             .c = element,

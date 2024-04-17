@@ -98,7 +98,7 @@ fn emit_enum(
                     @intFromEnum(@field(Type, field.name)),
                 });
             } else {
-                // Packed structs.
+                // @"packed" structs.
                 try buffer.writer().print("    {s}_{s} = 1 << {},\n", .{
                     c_name[0..suffix_pos],
                     to_uppercase(field.name),
@@ -172,9 +172,9 @@ pub fn main() !void {
 
         switch (@typeInfo(ZigType)) {
             .Struct => |info| switch (info.layout) {
-                .Auto => @compileError("Invalid C struct type: " ++ @typeName(ZigType)),
-                .Packed => try emit_enum(&buffer, ZigType, info, c_name, &.{"padding"}),
-                .Extern => try emit_struct(&buffer, info, c_name),
+                .auto => @compileError("Invalid C struct type: " ++ @typeName(ZigType)),
+                .@"packed" => try emit_enum(&buffer, ZigType, info, c_name, &.{"padding"}),
+                .@"extern" => try emit_struct(&buffer, info, c_name),
             },
             .Enum => |info| {
                 comptime var skip: []const []const u8 = &.{};

@@ -1,5 +1,6 @@
 const std = @import("std");
 const os = std.os;
+const posix = std.posix;
 const assert = std.debug.assert;
 const log = std.log.scoped(.io);
 const constants = @import("../constants.zig");
@@ -104,7 +105,7 @@ pub const IO = struct {
 
                 for (events[0..num_events]) |event| {
                     const raw_overlapped = event.lpOverlapped;
-                    const overlapped = @fieldParentPtr(Completion.Overlapped, "raw", raw_overlapped);
+                    const overlapped: *Completion.Overlapped = @fieldParentPtr("raw", raw_overlapped);
                     const completion = overlapped.completion;
                     completion.next = null;
                     self.completed.push(completion);
@@ -197,19 +198,19 @@ pub const IO = struct {
             send: Transfer,
             recv: Transfer,
             read: struct {
-                fd: os.fd_t,
+                fd: posix.fd_t,
                 buf: [*]u8,
                 len: u32,
                 offset: u64,
             },
             write: struct {
-                fd: os.fd_t,
+                fd: posix.fd_t,
                 buf: [*]const u8,
                 len: u32,
                 offset: u64,
             },
             close: struct {
-                fd: os.fd_t,
+                fd: posix.fd_t,
             },
             timeout: struct {
                 deadline: u64,
@@ -762,7 +763,7 @@ pub const IO = struct {
             result: ReadError!usize,
         ) void,
         completion: *Completion,
-        fd: os.fd_t,
+        fd: posix.fd_t,
         buffer: []u8,
         offset: u64,
     ) void {
@@ -806,7 +807,7 @@ pub const IO = struct {
             result: WriteError!usize,
         ) void,
         completion: *Completion,
-        fd: os.fd_t,
+        fd: posix.fd_t,
         buffer: []const u8,
         offset: u64,
     ) void {
@@ -841,7 +842,7 @@ pub const IO = struct {
             result: CloseError!void,
         ) void,
         completion: *Completion,
-        fd: os.fd_t,
+        fd: posix.fd_t,
     ) void {
         self.submit(
             context,
@@ -950,14 +951,14 @@ pub const IO = struct {
     }
 
     /// Opens a directory with read only access.
-    pub fn open_dir(dir_path: []const u8) !os.fd_t {
+    pub fn open_dir(dir_path: []const u8) !posix.fd_t {
         const dir = try std.fs.cwd().openDir(dir_path, .{});
         return dir.fd;
     }
 
     pub const INVALID_FILE = os.windows.INVALID_HANDLE_VALUE;
 
-    fn open_file_handle(relative_path: []const u8, method: enum { create, open }) !os.fd_t {
+    fn open_file_handle(relative_path: []const u8, method: enum { create, open }) !posix.fd_t {
         const path_w = try os.windows.sliceToPrefixedFileW(relative_path);
 
         // FILE_CREATE = O_CREAT | O_EXCL
@@ -1026,12 +1027,12 @@ pub const IO = struct {
     ///   The caller is responsible for ensuring that the parent directory inode is durable.
     /// - Verifies that the file size matches the expected file size before returning.
     pub fn open_file(
-        dir_handle: os.fd_t,
+        dir_handle: posix.fd_t,
         relative_path: []const u8,
         size: u64,
         method: enum { create, create_or_open, open },
         direct_io: DirectIO,
-    ) !os.fd_t {
+    ) !posix.fd_t {
         assert(relative_path.len > 0);
         assert(size % constants.sector_size == 0);
         // On windows, assume that Direct IO is always available.
@@ -1091,7 +1092,7 @@ pub const IO = struct {
         return handle;
     }
 
-    fn fs_lock(handle: os.fd_t, size: u64) !void {
+    fn fs_lock(handle: posix.fd_t, size: u64) !void {
         // TODO: Look into using SetFileIoOverlappedRange() for better unbuffered async IO perf
         // NOTE: Requires SeLockMemoryPrivilege.
 
@@ -1135,7 +1136,7 @@ pub const IO = struct {
         }
     }
 
-    fn fs_allocate(handle: os.fd_t, size: u64) !void {
+    fn fs_allocate(handle: posix.fd_t, size: u64) !void {
         // TODO: Look into using SetFileValidData() instead
         // NOTE: Requires SE_MANAGE_VOLUME_NAME privilege
 

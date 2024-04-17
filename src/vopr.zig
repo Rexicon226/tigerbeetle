@@ -143,7 +143,7 @@ fn build_simulator(
         else => unreachable,
     };
 
-    const exec_result = std.ChildProcess.exec(.{
+    const exec_result = std.ChildProcess.run(.{
         .allocator = allocator,
         .argv = &.{ "zig/zig", "build", "simulator", mode_str },
     }) catch |err| {
@@ -252,7 +252,7 @@ fn run_child_process(allocator: mem.Allocator, argv: []const []const u8) u8 {
 fn check_git_status(allocator: mem.Allocator) void {
     // Running git status to determine whether there is any uncommitted code or local changes.
     var args = [2][]const u8{ "git", "status" };
-    var exec_result = std.ChildProcess.exec(.{
+    var exec_result = std.ChildProcess.run(.{
         .allocator = allocator,
         .argv = &args,
     }) catch |err| {
@@ -341,7 +341,7 @@ fn create_report(allocator: mem.Allocator, bug: Bug, seed: u64) Report {
 
     // Running git log to extract the current TigerBeetle git commit hash from stdout.
     var args = [3][]const u8{ "git", "log", "-1" };
-    var exec_result = std.ChildProcess.exec(.{
+    var exec_result = std.ChildProcess.run(.{
         .allocator = allocator,
         .argv = &args,
     }) catch |err| {
@@ -359,8 +359,8 @@ fn create_report(allocator: mem.Allocator, bug: Bug, seed: u64) Report {
         fatal("unable to cast the git commit hash to hex. Error: {}", .{err});
     };
 
-    // Zig stores value as Little Endian when VOPR Hub is expecting Big Endian.
-    assert(@import("builtin").target.cpu.arch.endian() == .Little);
+    // Zig stores value as little Endian when VOPR Hub is expecting Big Endian.
+    assert(@import("builtin").target.cpu.arch.endian() == .little);
 
     var message = Report{
         .checksum = undefined,
@@ -381,7 +381,7 @@ fn create_report(allocator: mem.Allocator, bug: Bug, seed: u64) Report {
 fn fatal(comptime fmt_string: []const u8, args: anytype) noreturn {
     const stderr = std.io.getStdErr().writer();
     stderr.print("error: " ++ fmt_string ++ "\n", args) catch {};
-    os.exit(1);
+    posix.exit(1);
 }
 
 /// Parse e.g. `--seed=123` into 123 with error handling.
@@ -452,8 +452,8 @@ fn parse_args(allocator: mem.Allocator) !Flags {
                 ),
             };
         } else if (mem.eql(u8, arg, "-h") or mem.eql(u8, arg, "--help")) {
-            std.io.getStdOut().writeAll(usage) catch os.exit(1);
-            os.exit(0);
+            std.io.getStdOut().writeAll(usage) catch posix.exit(1);
+            posix.exit(0);
         } else if (mem.startsWith(u8, arg, "--")) {
             fatal("unexpected argument: '{s}'", .{arg});
         } else {

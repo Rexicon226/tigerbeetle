@@ -44,7 +44,7 @@ pub fn ForestTableIteratorType(comptime Forest: type) type {
         }
 
         break :iterator @Type(.{ .Struct = .{
-            .layout = .Auto,
+            .layout = .auto,
             .fields = fields,
             .decls = &.{},
             .is_tuple = false,

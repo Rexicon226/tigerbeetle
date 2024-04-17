@@ -1,8 +1,9 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const os = std.os;
+const posix = std.posix;
 const linux = os.linux;
-const IO_Uring = linux.IO_Uring;
+const IoUring = linux.IoUring;
 const io_uring_cqe = linux.io_uring_cqe;
 const io_uring_sqe = linux.io_uring_sqe;
 const log = std.log.scoped(.io);
@@ -16,7 +17,7 @@ const DirectIO = @import("../io.zig").DirectIO;
 const parse_dirty_semver = stdx.parse_dirty_semver;
 
 pub const IO = struct {
-    ring: IO_Uring,
+    ring: IoUring,
 
     /// Operations not yet submitted to the kernel and waiting on available space in the
     /// submission queue.
@@ -39,7 +40,7 @@ pub const IO = struct {
             @panic("Linux kernel 5.5 or greater is required for io_uring OP_ACCEPT");
         }
 
-        return IO{ .ring = try IO_Uring.init(entries, flags) };
+        return IO{ .ring = try IoUring.init(entries, flags) };
     }
 
     pub fn deinit(self: *IO) void {
@@ -553,35 +554,35 @@ pub const IO = struct {
     /// This union encodes the set of operations supported as well as their arguments.
     const Operation = union(enum) {
         accept: struct {
-            socket: os.socket_t,
-            address: os.sockaddr = undefined,
-            address_size: os.socklen_t = @sizeOf(os.sockaddr),
+            socket: posix.socket_t,
+            address: posix.sockaddr = undefined,
+            address_size: posix.socklen_t = @sizeOf(posix.sockaddr),
         },
         close: struct {
-            fd: os.fd_t,
+            fd: posix.fd_t,
         },
         connect: struct {
-            socket: os.socket_t,
+            socket: posix.socket_t,
             address: std.net.Address,
         },
         read: struct {
-            fd: os.fd_t,
+            fd: posix.fd_t,
             buffer: []u8,
             offset: u64,
         },
         recv: struct {
-            socket: os.socket_t,
+            socket: posix.socket_t,
             buffer: []u8,
         },
         send: struct {
-            socket: os.socket_t,
+            socket: posix.socket_t,
             buffer: []const u8,
         },
         timeout: struct {
             timespec: os.linux.kernel_timespec,
         },
         write: struct {
-            fd: os.fd_t,
+            fd: posix.fd_t,
             buffer: []const u8,
             offset: u64,
         },
@@ -653,7 +654,7 @@ pub const IO = struct {
             result: CloseError!void,
         ) void,
         completion: *Completion,
-        fd: os.fd_t,
+        fd: posix.fd_t,
     ) void {
         completion.* = .{
             .io = self,
@@ -750,7 +751,7 @@ pub const IO = struct {
             result: ReadError!usize,
         ) void,
         completion: *Completion,
-        fd: os.fd_t,
+        fd: posix.fd_t,
         buffer: []u8,
         offset: u64,
     ) void {
@@ -941,7 +942,7 @@ pub const IO = struct {
             result: WriteError!usize,
         ) void,
         completion: *Completion,
-        fd: os.fd_t,
+        fd: posix.fd_t,
         buffer: []const u8,
         offset: u64,
     ) void {
@@ -977,11 +978,11 @@ pub const IO = struct {
     }
 
     /// Opens a directory with read only access.
-    pub fn open_dir(dir_path: []const u8) !os.fd_t {
+    pub fn open_dir(dir_path: []const u8) !posix.fd_t {
         return os.open(dir_path, os.O.CLOEXEC | os.O.RDONLY, 0);
     }
 
-    pub const INVALID_FILE: os.fd_t = -1;
+    pub const INVALID_FILE: posix.fd_t = -1;
 
     /// Opens or creates a journal file:
     /// - For reading and writing.
@@ -992,12 +993,12 @@ pub const IO = struct {
     ///   The caller is responsible for ensuring that the parent directory inode is durable.
     /// - Verifies that the file size matches the expected file size before returning.
     pub fn open_file(
-        dir_fd: os.fd_t,
+        dir_fd: posix.fd_t,
         relative_path: []const u8,
         size: u64,
         method: enum { create, create_or_open, open },
         direct_io: DirectIO,
-    ) !os.fd_t {
+    ) !posix.fd_t {
         assert(relative_path.len > 0);
         assert(size % constants.sector_size == 0);
         // Be careful with openat(2): "If pathname is absolute, then dirfd is ignored." (man page)
@@ -1246,7 +1247,7 @@ pub const IO = struct {
 
     /// Detects whether the underlying file system for a given directory fd is tmpfs. This is used
     /// to relax our Direct I/O check - running on tmpfs for benchmarking is useful.
-    fn fs_is_tmpfs(dir_fd: std.os.fd_t) !bool {
+    fn fs_is_tmpfs(dir_fd: std.posix.fd_t) !bool {
         var statfs: stdx.StatFs = undefined;
 
         while (true) {
@@ -1263,7 +1264,7 @@ pub const IO = struct {
 
     /// Detects whether the underlying file system for a given directory fd supports Direct I/O.
     /// Not all Linux file systems support `O_DIRECT`, e.g. a shared macOS volume.
-    fn fs_supports_direct_io(dir_fd: std.os.fd_t) !bool {
+    fn fs_supports_direct_io(dir_fd: std.posix.fd_t) !bool {
         if (!@hasDecl(std.os.O, "DIRECT")) return false;
 
         const path = "fs_supports_direct_io";
@@ -1288,7 +1289,7 @@ pub const IO = struct {
 
     /// Allocates a file contiguously using fallocate() if supported.
     /// Alternatively, writes to the last sector so that at least the file size is correct.
-    fn fs_allocate(fd: os.fd_t, size: u64) !void {
+    fn fs_allocate(fd: posix.fd_t, size: u64) !void {
         const mode: i32 = 0;
         const offset: i64 = 0;
         const length: i64 = @intCast(size);

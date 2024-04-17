@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const os = std.os;
+const posix = std.posix;
 const testing = std.testing;
 const assert = std.debug.assert;
 
@@ -13,7 +14,7 @@ test "write/read/close" {
 
         io: IO,
         done: bool = false,
-        fd: os.fd_t,
+        fd: posix.fd_t,
 
         write_buf: [20]u8 = [_]u8{97} ** 20,
         read_buf: [20]u8 = [_]u8{98} ** 20,
