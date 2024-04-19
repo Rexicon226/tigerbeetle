@@ -762,13 +762,13 @@ pub fn ReplicaType(
         }
 
         fn journal_recover_callback(journal: *Journal) void {
-            const self: *Self = @fieldParentPtr("journal", journal);
+            const self: *Self = @alignCast(@fieldParentPtr("journal", journal));
             assert(!self.opened);
             self.opened = true;
         }
 
         fn grid_open_callback(grid: *Grid) void {
-            const self: *Self = @fieldParentPtr("grid", grid);
+            const self: *Self = @alignCast(@fieldParentPtr("grid", grid));
             assert(!self.state_machine_opened);
             assert(self.commit_stage == .idle);
             assert(self.syncing == .idle);
@@ -789,7 +789,7 @@ pub fn ReplicaType(
         }
 
         fn client_sessions_open_callback(client_sessions_checkpoint: *CheckpointTrailer) void {
-            const self: *Self = @fieldParentPtr("client_sessions_checkpoint", client_sessions_checkpoint);
+            const self: *Self = @alignCast(@fieldParentPtr("client_sessions_checkpoint", client_sessions_checkpoint));
             assert(!self.state_machine_opened);
             assert(self.commit_stage == .idle);
             assert(self.syncing == .idle);
@@ -846,7 +846,7 @@ pub fn ReplicaType(
         }
 
         fn state_machine_open_callback(state_machine: *StateMachine) void {
-            const self: *Self = @fieldParentPtr("state_machine", state_machine);
+            const self: *Self = @alignCast(@fieldParentPtr("state_machine", state_machine));
             assert(self.grid.free_set.opened);
             assert(!self.state_machine_opened);
             assert(self.commit_stage == .idle);
@@ -1263,7 +1263,7 @@ pub fn ReplicaType(
 
         /// Called by the MessageBus to deliver a message to the replica.
         fn on_message_from_bus(message_bus: *MessageBus, message: *Message) void {
-            const self: *Self = @fieldParentPtr("message_bus", message_bus);
+            const self: *Self = @alignCast(@fieldParentPtr("message_bus", message_bus));
             if (message.header.into(.request)) |header| {
                 assert(header.client != 0 or constants.aof_recovery);
             }
@@ -3688,7 +3688,7 @@ pub fn ReplicaType(
         }
 
         fn commit_op_prefetch_callback(state_machine: *StateMachine) void {
-            const self: *Self = @fieldParentPtr("state_machine", state_machine);
+            const self: *Self = @alignCast(@fieldParentPtr("state_machine", state_machine));
             assert(self.commit_stage == .prefetch_state_machine);
             assert(self.commit_prepare != null);
             assert(self.commit_prepare.?.header.op == self.commit_min + 1);
@@ -3753,7 +3753,7 @@ pub fn ReplicaType(
         }
 
         fn commit_op_compact_callback(state_machine: *StateMachine) void {
-            const self: *Self = @fieldParentPtr("state_machine", state_machine);
+            const self: *Self = @alignCast(@fieldParentPtr("state_machine", state_machine));
             assert(self.commit_stage == .compact_state_machine);
             assert(self.op_checkpoint() == self.superblock.staging.vsr_state.checkpoint.header.op);
             assert(self.op_checkpoint() == self.superblock.working.vsr_state.checkpoint.header.op);
@@ -3792,7 +3792,7 @@ pub fn ReplicaType(
         }
 
         fn commit_op_checkpoint_state_machine_callback(state_machine: *StateMachine) void {
-            const self: *Self = @fieldParentPtr("state_machine", state_machine);
+            const self: *Self = @alignCast(@fieldParentPtr("state_machine", state_machine));
             assert(self.commit_stage == .checkpoint_data);
             self.commit_op_checkpoint_data_callback(.state_machine);
         }
@@ -3804,13 +3804,13 @@ pub fn ReplicaType(
         }
 
         fn commit_op_checkpoint_client_sessions_callback(client_sessions_checkpoint: *CheckpointTrailer) void {
-            const self: *Self = @fieldParentPtr("client_sessions_checkpoint", client_sessions_checkpoint);
+            const self: *Self = @alignCast(@fieldParentPtr("client_sessions_checkpoint", client_sessions_checkpoint));
             assert(self.commit_stage == .checkpoint_data);
             self.commit_op_checkpoint_data_callback(.client_sessions);
         }
 
         fn commit_op_checkpoint_grid_callback(grid: *Grid) void {
-            const self: *Self = @fieldParentPtr("grid", grid);
+            const self: *Self = @alignCast(@fieldParentPtr("grid", grid));
             assert(self.commit_stage == .checkpoint_data);
             assert(self.commit_prepare.?.header.op <= self.op);
             assert(self.commit_prepare.?.header.op == self.commit_min);
@@ -8464,7 +8464,7 @@ pub fn ReplicaType(
         }
 
         fn sync_cancel_grid_callback(grid: *Grid) void {
-            const self: *Self = @fieldParentPtr("grid", grid);
+            const self: *Self = @alignCast(@fieldParentPtr("grid", grid));
             assert(self.syncing == .canceling_grid);
             assert(self.sync_tables == null);
             assert(self.grid_repair_tables.executing() == 0);

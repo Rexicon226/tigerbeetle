@@ -196,7 +196,7 @@ fn ReplicaFormatType(comptime Storage: type) type {
         }
 
         fn write_sectors_callback(write: *Storage.Write) void {
-            const self: *Self = @fieldParentPtr("write", write);
+            const self: *Self = @alignCast(@fieldParentPtr("write", write));
             assert(self.formatting);
             self.formatting = false;
         }

@@ -127,7 +127,7 @@ pub const AOF = struct {
     pub fn from_absolute_path(absolute_path: []const u8) !AOF {
         const dirname = std.fs.path.dirname(absolute_path) orelse ".";
         const dir_fd = try IO.open_dir(dirname);
-        errdefer os.close(dir_fd);
+        errdefer posix.close(dir_fd);
 
         const basename = std.fs.path.basename(absolute_path);
 
@@ -136,7 +136,7 @@ pub const AOF = struct {
 
     fn init(dir_fd: posix.fd_t, relative_path: []const u8) !AOF {
         const fd = try IO.open_file(dir_fd, relative_path, 0, .create_or_open, .direct_io_required);
-        errdefer os.close(fd);
+        errdefer posix.close(fd);
 
         try os.lseek_END(fd, 0);
 
@@ -144,7 +144,7 @@ pub const AOF = struct {
     }
 
     pub fn close(self: *AOF) void {
-        os.close(self.fd);
+        posix.close(self.fd);
     }
 
     /// Write a message to disk. Once this function returns, the data passed in

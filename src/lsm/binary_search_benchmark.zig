@@ -197,7 +197,7 @@ const Benchmark = struct {
     fn end(self: *Benchmark, samples: usize) !BenchmarkResult {
         defer {
             for (perf_counters, 0..) |_, i| {
-                std.os.close(self.perf_fds[i]);
+                std.posix.close(self.perf_fds[i]);
                 self.perf_fds[i] = -1;
             }
         }

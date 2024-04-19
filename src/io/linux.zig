@@ -34,7 +34,7 @@ pub const IO = struct {
 
     pub fn init(entries: u12, flags: u32) !IO {
         // Detect the linux version to ensure that we support all io_uring ops used.
-        const uts = std.os.uname();
+        const uts = posix.uname();
         const version = try parse_dirty_semver(&uts.release);
         if (version.order(std.SemanticVersion{ .major = 5, .minor = 5, .patch = 0 }) == .lt) {
             @panic("Linux kernel 5.5 or greater is required for io_uring OP_ACCEPT");
@@ -80,8 +80,8 @@ pub const IO = struct {
         // We must use the same clock source used by io_uring (CLOCK_MONOTONIC) since we specify the
         // timeout below as an absolute value. Otherwise, we may deadlock if the clock sources are
         // dramatically different. Any kernel that supports io_uring will support CLOCK_MONOTONIC.
-        var current_ts: os.timespec = undefined;
-        os.clock_gettime(os.CLOCK.MONOTONIC, &current_ts) catch unreachable;
+        var current_ts: posix.timespec = undefined;
+        posix.clock_gettime(posix.CLOCK.MONOTONIC, &current_ts) catch unreachable;
         // The absolute CLOCK_MONOTONIC time after which we may return from this function:
         const timeout_ts: os.linux.kernel_timespec = .{
             .tv_sec = current_ts.tv_sec,
@@ -96,7 +96,7 @@ pub const IO = struct {
                 break :blk self.ring.get_sqe() catch unreachable;
             };
             // Submit an absolute timeout that will be canceled if any other SQE completes first:
-            linux.io_uring_prep_timeout(timeout_sqe, &timeout_ts, 1, os.linux.IORING_TIMEOUT_ABS);
+            linux.io_uring_sqe.prep_timeout(timeout_sqe, &timeout_ts, 1, os.linux.IORING_TIMEOUT_ABS);
             timeout_sqe.user_data = 0;
             timeouts += 1;
 
@@ -176,7 +176,7 @@ pub const IO = struct {
                     // it was completed due to the completion of an event, in which case `cqe.res`
                     // would be 0. It is possible for multiple timeout operations to complete at the
                     // same time if the nanoseconds value passed to `run_for_ns()` is very short.
-                    if (-cqe.res == @intFromEnum(os.E.TIME)) etime.* = true;
+                    if (-cqe.res == @intFromEnum(posix.E.TIME)) etime.* = true;
                     continue;
                 }
                 const completion: *Completion = @ptrFromInt(cqe.user_data);
@@ -259,19 +259,19 @@ pub const IO = struct {
         fn prep(completion: *Completion, sqe: *io_uring_sqe) void {
             switch (completion.operation) {
                 .accept => |*op| {
-                    linux.io_uring_prep_accept(
+                    linux.io_uring_sqe.prep_accept(
                         sqe,
                         op.socket,
                         &op.address,
                         &op.address_size,
-                        os.SOCK.CLOEXEC,
+                        posix.SOCK.CLOEXEC,
                     );
                 },
                 .close => |op| {
-                    linux.io_uring_prep_close(sqe, op.fd);
+                    linux.io_uring_sqe.prep_close(sqe, op.fd);
                 },
                 .connect => |*op| {
-                    linux.io_uring_prep_connect(
+                    linux.io_uring_sqe.prep_connect(
                         sqe,
                         op.socket,
                         &op.address.any,
@@ -279,7 +279,7 @@ pub const IO = struct {
                     );
                 },
                 .read => |op| {
-                    linux.io_uring_prep_read(
+                    linux.io_uring_sqe.prep_read(
                         sqe,
                         op.fd,
                         op.buffer[0..buffer_limit(op.buffer.len)],
@@ -287,16 +287,16 @@ pub const IO = struct {
                     );
                 },
                 .recv => |op| {
-                    linux.io_uring_prep_recv(sqe, op.socket, op.buffer, os.MSG.NOSIGNAL);
+                    linux.io_uring_sqe.prep_recv(sqe, op.socket, op.buffer, posix.MSG.NOSIGNAL);
                 },
                 .send => |op| {
-                    linux.io_uring_prep_send(sqe, op.socket, op.buffer, os.MSG.NOSIGNAL);
+                    linux.io_uring_sqe.prep_send(sqe, op.socket, op.buffer, posix.MSG.NOSIGNAL);
                 },
                 .timeout => |*op| {
-                    linux.io_uring_prep_timeout(sqe, &op.timespec, 0, 0);
+                    linux.io_uring_sqe.prep_timeout(sqe, &op.timespec, 0, 0);
                 },
                 .write => |op| {
-                    linux.io_uring_prep_write(
+                    linux.io_uring_sqe.prep_write(
                         sqe,
                         op.fd,
                         op.buffer[0..buffer_limit(op.buffer.len)],
@@ -310,9 +310,9 @@ pub const IO = struct {
         fn complete(completion: *Completion, callback_tracer_slot: *?tracer.SpanStart) void {
             switch (completion.operation) {
                 .accept => {
-                    const result: anyerror!os.socket_t = blk: {
+                    const result: anyerror!posix.socket_t = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 .INTR => {
                                     completion.io.enqueue(completion);
                                     return;
@@ -330,7 +330,7 @@ pub const IO = struct {
                                 .OPNOTSUPP => error.OperationNotSupported,
                                 .PERM => error.PermissionDenied,
                                 .PROTO => error.ProtocolFailure,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -342,14 +342,14 @@ pub const IO = struct {
                 .close => {
                     const result: anyerror!void = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 // A success, see https://github.com/ziglang/zig/issues/2425
                                 .INTR => {},
                                 .BADF => error.FileDescriptorInvalid,
                                 .DQUOT => error.DiskQuota,
                                 .IO => error.InputOutput,
                                 .NOSPC => error.NoSpaceLeft,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -361,7 +361,7 @@ pub const IO = struct {
                 .connect => {
                     const result: anyerror!void = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 .INTR => {
                                     completion.io.enqueue(completion);
                                     return;
@@ -383,7 +383,7 @@ pub const IO = struct {
                                 .PERM => error.PermissionDenied,
                                 .PROTOTYPE => error.ProtocolNotSupported,
                                 .TIMEDOUT => error.ConnectionTimedOut,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -395,7 +395,7 @@ pub const IO = struct {
                 .read => {
                     const result: anyerror!usize = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 .INTR => {
                                     completion.io.enqueue(completion);
                                     return;
@@ -413,7 +413,7 @@ pub const IO = struct {
                                 .OVERFLOW => error.Unseekable,
                                 .SPIPE => error.Unseekable,
                                 .TIMEDOUT => error.ConnectionTimedOut,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -425,7 +425,7 @@ pub const IO = struct {
                 .recv => {
                     const result: anyerror!usize = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 .INTR => {
                                     completion.io.enqueue(completion);
                                     return;
@@ -441,7 +441,7 @@ pub const IO = struct {
                                 .CONNRESET => error.ConnectionResetByPeer,
                                 .TIMEDOUT => error.ConnectionTimedOut,
                                 .OPNOTSUPP => error.OperationNotSupported,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -453,7 +453,7 @@ pub const IO = struct {
                 .send => {
                     const result: anyerror!usize = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 .INTR => {
                                     completion.io.enqueue(completion);
                                     return;
@@ -476,7 +476,7 @@ pub const IO = struct {
                                 .OPNOTSUPP => error.OperationNotSupported,
                                 .PIPE => error.BrokenPipe,
                                 .TIMEDOUT => error.ConnectionTimedOut,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -487,14 +487,14 @@ pub const IO = struct {
                 },
                 .timeout => {
                     assert(completion.result < 0);
-                    const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                    const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                         .INTR => {
                             completion.io.enqueue(completion);
                             return;
                         },
                         .CANCELED => error.Canceled,
                         .TIME => {}, // A success.
-                        else => |errno| os.unexpectedErrno(errno),
+                        else => |errno| posix.unexpectedErrno(errno),
                     };
                     const result: anyerror!void = err;
                     call_callback(completion, &result, callback_tracer_slot);
@@ -502,7 +502,7 @@ pub const IO = struct {
                 .write => {
                     const result: anyerror!usize = blk: {
                         if (completion.result < 0) {
-                            const err = switch (@as(os.E, @enumFromInt(-completion.result))) {
+                            const err = switch (@as(posix.E, @enumFromInt(-completion.result))) {
                                 .INTR => {
                                     completion.io.enqueue(completion);
                                     return;
@@ -521,7 +521,7 @@ pub const IO = struct {
                                 .PERM => error.AccessDenied,
                                 .PIPE => error.BrokenPipe,
                                 .SPIPE => error.Unseekable,
-                                else => |errno| os.unexpectedErrno(errno),
+                                else => |errno| posix.unexpectedErrno(errno),
                             };
                             break :blk err;
                         } else {
@@ -600,7 +600,7 @@ pub const IO = struct {
         OperationNotSupported,
         PermissionDenied,
         ProtocolFailure,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn accept(
         self: *IO,
@@ -609,10 +609,10 @@ pub const IO = struct {
         comptime callback: fn (
             context: Context,
             completion: *Completion,
-            result: AcceptError!os.socket_t,
+            result: AcceptError!posix.socket_t,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
     ) void {
         completion.* = .{
             .io = self,
@@ -622,7 +622,7 @@ pub const IO = struct {
                     callback(
                         @ptrCast(@alignCast(ctx)),
                         comp,
-                        @as(*const AcceptError!os.socket_t, @ptrCast(@alignCast(res))).*,
+                        @as(*const AcceptError!posix.socket_t, @ptrCast(@alignCast(res))).*,
                     );
                 }
             }.wrapper,
@@ -630,7 +630,7 @@ pub const IO = struct {
                 .accept = .{
                     .socket = socket,
                     .address = undefined,
-                    .address_size = @sizeOf(os.sockaddr),
+                    .address_size = @sizeOf(posix.sockaddr),
                 },
             },
         };
@@ -642,7 +642,7 @@ pub const IO = struct {
         DiskQuota,
         InputOutput,
         NoSpaceLeft,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn close(
         self: *IO,
@@ -692,7 +692,7 @@ pub const IO = struct {
         ProtocolNotSupported,
         ConnectionTimedOut,
         SystemResources,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn connect(
         self: *IO,
@@ -704,7 +704,7 @@ pub const IO = struct {
             result: ConnectError!void,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
         address: std.net.Address,
     ) void {
         completion.* = .{
@@ -739,7 +739,7 @@ pub const IO = struct {
         SystemResources,
         Unseekable,
         ConnectionTimedOut,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn read(
         self: *IO,
@@ -787,7 +787,7 @@ pub const IO = struct {
         FileDescriptorNotASocket,
         ConnectionTimedOut,
         OperationNotSupported,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn recv(
         self: *IO,
@@ -799,7 +799,7 @@ pub const IO = struct {
             result: RecvError!usize,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
         buffer: []u8,
     ) void {
         completion.* = .{
@@ -838,7 +838,7 @@ pub const IO = struct {
         OperationNotSupported,
         BrokenPipe,
         ConnectionTimedOut,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn send(
         self: *IO,
@@ -850,7 +850,7 @@ pub const IO = struct {
             result: SendError!usize,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
         buffer: []const u8,
     ) void {
         completion.* = .{
@@ -875,7 +875,7 @@ pub const IO = struct {
         self.enqueue(completion);
     }
 
-    pub const TimeoutError = error{Canceled} || os.UnexpectedError;
+    pub const TimeoutError = error{Canceled} || posix.UnexpectedError;
 
     pub fn timeout(
         self: *IO,
@@ -910,7 +910,7 @@ pub const IO = struct {
 
         // Special case a zero timeout as a yield.
         if (nanoseconds == 0) {
-            completion.result = -@as(i32, @intFromEnum(std.os.E.TIME));
+            completion.result = -@as(i32, @intFromEnum(std.posix.E.TIME));
             self.completed.push(completion);
             return;
         }
@@ -930,7 +930,7 @@ pub const IO = struct {
         Unseekable,
         AccessDenied,
         BrokenPipe,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn write(
         self: *IO,
@@ -972,14 +972,14 @@ pub const IO = struct {
     pub const INVALID_SOCKET = -1;
 
     /// Creates a socket that can be used for async operations with the IO instance.
-    pub fn open_socket(self: *IO, family: u32, sock_type: u32, protocol: u32) !os.socket_t {
+    pub fn open_socket(self: *IO, family: u32, sock_type: u32, protocol: u32) !posix.socket_t {
         _ = self;
-        return os.socket(family, sock_type, protocol);
+        return posix.socket(family, sock_type, protocol);
     }
 
     /// Opens a directory with read only access.
     pub fn open_dir(dir_path: []const u8) !posix.fd_t {
-        return os.open(dir_path, os.O.CLOEXEC | os.O.RDONLY, 0);
+        return posix.open(dir_path, .{ .CLOEXEC = true, .ACCMODE = .RDONLY }, 0);
     }
 
     pub const INVALID_FILE: posix.fd_t = -1;
@@ -1004,11 +1004,11 @@ pub const IO = struct {
         // Be careful with openat(2): "If pathname is absolute, then dirfd is ignored." (man page)
         assert(!std.fs.path.isAbsolute(relative_path));
 
-        var flags: u32 = os.O.CLOEXEC | os.O.RDWR | os.O.DSYNC;
-        var mode: os.mode_t = 0;
+        var flags: posix.O = .{ .CLOEXEC = true, .DSYNC = true };
+        var mode: posix.mode_t = 0;
 
         const kind: enum { file, block_device } = blk: {
-            const stat = os.fstatat(
+            const stat = posix.fstatat(
                 dir_fd,
                 relative_path,
                 0,
@@ -1025,10 +1025,10 @@ pub const IO = struct {
                 },
                 else => |err_| return err_,
             };
-            if (os.S.ISBLK(stat.mode)) {
+            if (posix.S.ISBLK(stat.mode)) {
                 break :blk .block_device;
             } else {
-                if (!os.S.ISREG(stat.mode)) {
+                if (!posix.S.ISREG(stat.mode)) {
                     @panic("file path does not point to block device or regular file.");
                 }
                 break :blk .file;
@@ -1039,13 +1039,13 @@ pub const IO = struct {
         // This will avoid errors with handling large files on certain configurations
         // of 32bit kernels. In all other cases, it's a noop.
         // See: <https://github.com/torvalds/linux/blob/ab27740f76654ed58dd32ac0ba0031c18a6dea3b/fs/open.c#L1602>
-        if (@hasDecl(os.O, "LARGEFILE")) flags |= os.O.LARGEFILE;
+        if (@hasDecl(posix.O, "LARGEFILE")) flags.LARGEFILE = true;
 
         switch (kind) {
             .block_device => {
                 if (direct_io != .direct_io_disabled) {
                     // Block devices should always support Direct IO.
-                    flags |= os.O.DIRECT;
+                    flags.DIRECT = true;
                     // Use O_EXCL when opening as a block device to obtain an advisory exclusive
                     // lock. Normally, you can't do this for files you don't create, but for
                     // block devices this guarantees:
@@ -1058,7 +1058,7 @@ pub const IO = struct {
                     // This should be stronger than flock(2) locks, which work on a separate system.
                     // The relevant kernel code (as of v6.7) is here:
                     // <https://github.com/torvalds/linux/blob/7da71072e1d6967c0482abcbb5991ffb5953fdf2/block/bdev.c#L932>
-                    flags |= os.O.EXCL;
+                    flags.EXCL = true;
                 }
                 log.info("opening block device \"{s}\"...", .{relative_path});
             },
@@ -1080,7 +1080,7 @@ pub const IO = struct {
                 if (direct_io != .direct_io_disabled and !dir_on_tmpfs) {
                     direct_io_supported = try fs_supports_direct_io(dir_fd);
                     if (direct_io_supported) {
-                        flags |= os.O.DIRECT;
+                        flags.DIRECT = true;
                     } else if (direct_io == .direct_io_optional) {
                         log.warn("This file system does not support Direct I/O.", .{});
                     } else {
@@ -1099,13 +1099,13 @@ pub const IO = struct {
 
                 switch (method) {
                     .create => {
-                        flags |= os.O.CREAT;
-                        flags |= os.O.EXCL;
+                        flags.CREAT = true;
+                        flags.EXCL = true;
                         mode = 0o666;
                         log.info("creating \"{s}\"...", .{relative_path});
                     },
                     .create_or_open => {
-                        flags |= os.O.CREAT;
+                        flags.CREAT = true;
                         mode = 0o666;
                         log.info("opening or creating \"{s}\"...", .{relative_path});
                     },
@@ -1117,24 +1117,24 @@ pub const IO = struct {
         }
 
         // This is critical as we rely on O_DSYNC for fsync() whenever we write to the file:
-        assert((flags & os.O.DSYNC) > 0);
+        assert(flags.DSYNC);
 
-        const fd = try os.openat(dir_fd, relative_path, flags, mode);
+        const fd = try posix.openat(dir_fd, relative_path, flags, mode);
         // TODO Return a proper error message when the path exists or does not exist (init/start).
-        errdefer os.close(fd);
+        errdefer posix.close(fd);
 
         {
             // Make sure we're getting the type of file descriptor we expect.
-            const stat = try os.fstat(fd);
+            const stat = try posix.fstat(fd);
             switch (kind) {
-                .file => assert(os.S.ISREG(stat.mode)),
-                .block_device => assert(os.S.ISBLK(stat.mode)),
+                .file => assert(posix.S.ISREG(stat.mode)),
+                .block_device => assert(posix.S.ISBLK(stat.mode)),
             }
         }
 
         // Obtain an advisory exclusive lock that works only if all processes actually use flock().
         // LOCK_NB means that we want to fail the lock without waiting if another process has it.
-        os.flock(fd, os.LOCK.EX | os.LOCK.NB) catch |err| switch (err) {
+        posix.flock(fd, posix.LOCK.EX | posix.LOCK.NB) catch |err| switch (err) {
             error.WouldBlock => @panic("another process holds the data file lock"),
             else => return err,
         };
@@ -1158,7 +1158,7 @@ pub const IO = struct {
                     const write_offset = size - sector.len;
                     var written: usize = 0;
                     while (written < sector.len) {
-                        written += try os.pwrite(fd, sector[written..], write_offset + written);
+                        written += try posix.pwrite(fd, sector[written..], write_offset + written);
                     }
                 },
                 else => |e| return e,
@@ -1169,16 +1169,16 @@ pub const IO = struct {
         // making decisions on data that was never durably written by a previously crashed process.
         // We therefore always fsync when we open the path, also to wait for any pending O_DSYNC.
         // Thanks to Alex Miller from FoundationDB for diving into our source and pointing this out.
-        try os.fsync(fd);
+        try posix.fsync(fd);
 
         // We fsync the parent directory to ensure that the file inode is durably written.
         // The caller is responsible for the parent directory inode stored under the grandparent.
         // We always do this when opening because we don't know if this was done before crashing.
-        try os.fsync(dir_fd);
+        try posix.fsync(dir_fd);
 
         switch (kind) {
             .file => {
-                if ((try os.fstat(fd)).size < size) {
+                if ((try posix.fstat(fd)).size < size) {
                     @panic("data file inode size was truncated or corrupted");
                 }
             },
@@ -1186,7 +1186,7 @@ pub const IO = struct {
                 const BLKGETSIZE64 = os.linux.IOCTL.IOR(0x12, 114, usize);
                 var block_device_size: usize = 0;
 
-                switch (std.os.errno(os.linux.ioctl(
+                switch (std.posix.errno(os.linux.ioctl(
                     fd,
                     BLKGETSIZE64,
                     @intFromPtr(&block_device_size),
@@ -1197,7 +1197,7 @@ pub const IO = struct {
                     .BADF => return error.InvalidFileDescriptor,
                     .NOTTY => return error.BadRequest,
                     .FAULT => return error.InvalidAddress,
-                    else => |err| return os.unexpectedErrno(err),
+                    else => |err| return posix.unexpectedErrno(err),
                 }
 
                 if (block_device_size < size) {
@@ -1226,7 +1226,7 @@ pub const IO = struct {
                     // We can do this without worrying about retrying partial reads because on
                     // linux, read(2) on block devices can not be interrupted by signals.
                     // See signal(7).
-                    assert(superblock_zone_size == try os.read(fd, &read_buf));
+                    assert(superblock_zone_size == try posix.read(fd, &read_buf));
                     if (!std.mem.allEqual(u8, &read_buf, 0)) {
                         std.debug.panic(
                             "Superblock on block device not empty. " ++
@@ -1236,8 +1236,8 @@ pub const IO = struct {
                         );
                     }
                     // Reset position in the block device to compensate for read(2).
-                    try os.lseek_CUR(fd, -superblock_zone_size);
-                    assert(try os.lseek_CUR_get(fd) == 0);
+                    try posix.lseek_CUR(fd, -superblock_zone_size);
+                    assert(try posix.lseek_CUR_get(fd) == 0);
                 }
             },
         }
@@ -1252,12 +1252,12 @@ pub const IO = struct {
 
         while (true) {
             const res = stdx.fstatfs(dir_fd, &statfs);
-            switch (os.linux.getErrno(res)) {
+            switch (posix.errno(res)) {
                 .SUCCESS => {
                     return statfs.f_type == stdx.TmpfsMagic;
                 },
                 .INTR => continue,
-                else => |err| return os.unexpectedErrno(err),
+                else => |err| return posix.unexpectedErrno(err),
             }
         }
     }
@@ -1265,24 +1265,24 @@ pub const IO = struct {
     /// Detects whether the underlying file system for a given directory fd supports Direct I/O.
     /// Not all Linux file systems support `O_DIRECT`, e.g. a shared macOS volume.
     fn fs_supports_direct_io(dir_fd: std.posix.fd_t) !bool {
-        if (!@hasDecl(std.os.O, "DIRECT")) return false;
+        if (!@hasDecl(std.posix.O, "DIRECT")) return false;
 
         const path = "fs_supports_direct_io";
         const dir = std.fs.Dir{ .fd = dir_fd };
-        const fd = try os.openatZ(dir_fd, path, os.O.CLOEXEC | os.O.CREAT | os.O.TRUNC, 0o666);
-        defer os.close(fd);
+        const fd = try posix.openatZ(dir_fd, path, .{ .CLOEXEC = true, .CREAT = true, .TRUNC = true }, 0o666);
+        defer posix.close(fd);
         defer dir.deleteFile(path) catch {};
 
         while (true) {
-            const res = os.linux.openat(dir_fd, path, os.O.CLOEXEC | os.O.RDONLY | os.O.DIRECT, 0);
-            switch (os.linux.getErrno(res)) {
+            const res = os.linux.openat(dir_fd, path, .{ .CLOEXEC = true, .ACCMODE = .RDONLY, .DIRECT = true }, 0);
+            switch (posix.errno(res)) {
                 .SUCCESS => {
-                    os.close(@intCast(res));
+                    posix.close(@intCast(res));
                     return true;
                 },
                 .INTR => continue,
                 .INVAL => return false,
-                else => |err| return os.unexpectedErrno(err),
+                else => |err| return posix.unexpectedErrno(err),
             }
         }
     }
@@ -1296,7 +1296,7 @@ pub const IO = struct {
 
         while (true) {
             const rc = os.linux.fallocate(fd, mode, offset, length);
-            switch (os.linux.getErrno(rc)) {
+            switch (posix.errno(rc)) {
                 .SUCCESS => return,
                 .BADF => return error.FileDescriptorInvalid,
                 .FBIG => return error.FileTooBig,
@@ -1310,7 +1310,7 @@ pub const IO = struct {
                 .PERM => return error.PermissionDenied,
                 .SPIPE => return error.Unseekable,
                 .TXTBSY => return error.FileBusy,
-                else => |errno| return os.unexpectedErrno(errno),
+                else => |errno| return posix.unexpectedErrno(errno),
             }
         }
     }

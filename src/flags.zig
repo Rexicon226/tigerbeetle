@@ -150,7 +150,25 @@ fn parse_flags(args: *std.process.ArgIterator, comptime Flags: type) Flags {
     };
 
     var result: Flags = undefined;
-    var counts: std.enums.EnumFieldStruct(Flags, u32, 0) = .{};
+    var counts = (blk: {
+        const StructField = std.builtin.Type.StructField;
+        var flag_fields: []const StructField = &[_]StructField{};
+        for (std.meta.fields(Flags)) |field| {
+            flag_fields = flag_fields ++ &[_]StructField{.{
+                .name = field.name,
+                .type = u32,
+                .default_value = @ptrCast(&@as(u32, 0)),
+                .is_comptime = false,
+                .alignment = @alignOf(u32),
+            }};
+        }
+        break :blk @Type(.{ .Struct = .{
+            .layout = .auto,
+            .fields = flag_fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+    }){};
 
     // When parsing arguments, we must consider longer arguments first, such that `--foo-bar=92` is
     // not confused for a misspelled `--foo=92`. Using `std.sort` for comptime-only values does not

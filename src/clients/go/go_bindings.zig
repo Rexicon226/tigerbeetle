@@ -61,7 +61,7 @@ fn to_pascal_case(comptime input: []const u8, comptime min_len: ?usize) []const 
             if (is_upper_case(word)) {
                 _ = std.ascii.upperString(output[len..], word);
             } else {
-                std.mem.copy(u8, output[len..], word);
+                @memcpy(output[len..], word);
                 output[len] = std.ascii.toUpper(output[len]);
             }
             len += word.len;
@@ -73,8 +73,8 @@ fn to_pascal_case(comptime input: []const u8, comptime min_len: ?usize) []const 
 
 fn calculate_min_len(comptime type_info: anytype) comptime_int {
     comptime {
-        comptime var min_len: comptime_int = 0;
-        inline for (type_info.fields) |field| {
+        var min_len: comptime_int = 0;
+        for (type_info.fields) |field| {
             const field_len = to_pascal_case(field.name, null).len;
             if (field_len > min_len) {
                 min_len = field_len;

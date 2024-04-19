@@ -14,9 +14,9 @@ const log = std.log.scoped(.tb_client_signal);
 /// to resolve IO.Completions on the tigerbeetle thread.
 pub const Signal = struct {
     io: *IO,
-    server_socket: os.socket_t,
-    accept_socket: os.socket_t,
-    connect_socket: os.socket_t,
+    server_socket: posix.socket_t,
+    accept_socket: posix.socket_t,
+    connect_socket: posix.socket_t,
 
     completion: IO.Completion,
     recv_buffer: [1]u8,
@@ -31,10 +31,10 @@ pub const Signal = struct {
 
     pub fn init(self: *Signal, io: *IO, on_signal_fn: *const fn (*Signal) void) !void {
         self.io = io;
-        self.server_socket = os.socket(
+        self.server_socket = posix.socket(
             os.AF.INET,
-            os.SOCK.STREAM | os.SOCK.NONBLOCK,
-            os.IPPROTO.TCP,
+            posix.SOCK.STREAM | posix.SOCK.NONBLOCK,
+            posix.IPPROTO.TCP,
         ) catch |err| {
             log.err("failed to create signal server socket: {}", .{err});
             return switch (err) {
@@ -43,12 +43,12 @@ pub const Signal = struct {
                 error.Unexpected => error.Unexpected,
             };
         };
-        errdefer os.closeSocket(self.server_socket);
+        errdefer posix.close(self.server_socket);
 
         // Windows requires that the socket is bound before listening
         if (builtin.target.os.tag == .windows) {
             const addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, 0); // zero port lets the OS choose
-            os.bind(self.server_socket, &addr.any, addr.getOsSockLen()) catch |err| {
+            posix.bind(self.server_socket, &addr.any, addr.getOsSockLen()) catch |err| {
                 log.err("failed to bind the server socket to a local random port: {}", .{err});
                 return switch (err) {
                     error.AccessDenied => unreachable,
@@ -65,7 +65,7 @@ pub const Signal = struct {
             };
         }
 
-        os.listen(self.server_socket, 1) catch |err| {
+        posix.listen(self.server_socket, 1) catch |err| {
             log.err("failed to listen on signal server socket: {}", .{err});
             return switch (err) {
                 error.AddressInUse => unreachable,
@@ -80,7 +80,7 @@ pub const Signal = struct {
 
         var addr = std.net.Address.initIp4(undefined, undefined);
         var addr_len = addr.getOsSockLen();
-        os.getsockname(self.server_socket, &addr.any, &addr_len) catch |err| {
+        posix.getsockname(self.server_socket, &addr.any, &addr_len) catch |err| {
             log.err("failed to get address of signal server socket: {}", .{err});
             return switch (err) {
                 error.SocketNotBound => unreachable,
@@ -93,13 +93,13 @@ pub const Signal = struct {
 
         self.connect_socket = self.io.open_socket(
             os.AF.INET,
-            os.SOCK.STREAM,
-            os.IPPROTO.TCP,
+            posix.SOCK.STREAM,
+            posix.IPPROTO.TCP,
         ) catch |err| {
             log.err("failed to create signal connect socket: {}", .{err});
             return error.Unexpected;
         };
-        errdefer os.closeSocket(self.connect_socket);
+        errdefer posix.close(self.connect_socket);
 
         // Tracks when the connect_socket connects to the server_socket
         const DoConnect = struct {
@@ -172,9 +172,9 @@ pub const Signal = struct {
     }
 
     pub fn deinit(self: *Signal) void {
-        os.closeSocket(self.server_socket);
-        os.closeSocket(self.accept_socket);
-        os.closeSocket(self.connect_socket);
+        posix.close(self.server_socket);
+        posix.close(self.accept_socket);
+        posix.close(self.connect_socket);
     }
 
     /// Schedules the on_signal callback to be invoked on the IO thread.

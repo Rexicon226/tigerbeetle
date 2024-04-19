@@ -176,7 +176,7 @@ pub const IO = struct {
         };
 
         const Transfer = struct {
-            socket: os.socket_t,
+            socket: posix.socket_t,
             buf: os.windows.ws2_32.WSABUF,
             overlapped: Overlapped,
             pending: bool,
@@ -185,12 +185,12 @@ pub const IO = struct {
         const Operation = union(enum) {
             accept: struct {
                 overlapped: Overlapped,
-                listen_socket: os.socket_t,
-                client_socket: os.socket_t,
+                listen_socket: posix.socket_t,
+                client_socket: posix.socket_t,
                 addr_buffer: [(@sizeOf(std.net.Address) + 16) * 2]u8 align(4),
             },
             connect: struct {
-                socket: os.socket_t,
+                socket: posix.socket_t,
                 address: std.net.Address,
                 overlapped: Overlapped,
                 pending: bool,
@@ -280,10 +280,10 @@ pub const IO = struct {
         comptime callback: fn (
             context: Context,
             completion: *Completion,
-            result: AcceptError!os.socket_t,
+            result: AcceptError!posix.socket_t,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
     ) void {
         self.submit(
             context,
@@ -297,7 +297,7 @@ pub const IO = struct {
                 .addr_buffer = undefined,
             },
             struct {
-                fn do_operation(ctx: Completion.Context, op: anytype) AcceptError!os.socket_t {
+                fn do_operation(ctx: Completion.Context, op: anytype) AcceptError!posix.socket_t {
                     var flags: os.windows.DWORD = undefined;
                     var transferred: os.windows.DWORD = undefined;
 
@@ -307,8 +307,8 @@ pub const IO = struct {
                             // Create the socket that will be used for accept.
                             op.client_socket = ctx.io.open_socket(
                                 os.AF.INET,
-                                os.SOCK.STREAM,
-                                os.IPPROTO.TCP,
+                                posix.SOCK.STREAM,
+                                posix.IPPROTO.TCP,
                             ) catch |err| switch (err) {
                                 error.AddressFamilyNotSupported, error.ProtocolNotSupported => unreachable,
                                 else => |e| return e,
@@ -360,7 +360,7 @@ pub const IO = struct {
                     errdefer |err| switch (err) {
                         error.WouldBlock => {},
                         else => {
-                            os.closeSocket(op.client_socket);
+                            posix.close(op.client_socket);
                             op.client_socket = INVALID_SOCKET;
                         },
                     };
@@ -389,7 +389,7 @@ pub const IO = struct {
         DiskQuota,
         InputOutput,
         NoSpaceLeft,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub const ConnectError = os.ConnectError || error{FileDescriptorNotASocket};
 
@@ -403,7 +403,7 @@ pub const IO = struct {
             result: ConnectError!void,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
         address: std.net.Address,
     ) void {
         self.submit(
@@ -437,7 +437,7 @@ pub const IO = struct {
                         // ConnectEx requires the socket to be initially bound (INADDR_ANY)
                         const inaddr_any = std.mem.zeroes([4]u8);
                         const bind_addr = std.net.Address.initIp4(inaddr_any, 0);
-                        os.bind(
+                        posix.bind(
                             op.socket,
                             &bind_addr.any,
                             bind_addr.getOsSockLen(),
@@ -455,7 +455,7 @@ pub const IO = struct {
                         const LPFN_CONNECTEX = *const fn (
                             Socket: os.windows.ws2_32.SOCKET,
                             SockAddr: *const os.windows.ws2_32.sockaddr,
-                            SockLen: os.socklen_t,
+                            SockLen: posix.socklen_t,
                             SendBuf: ?*const anyopaque,
                             SendBufLen: os.windows.DWORD,
                             BytesSent: *os.windows.DWORD,
@@ -552,7 +552,7 @@ pub const IO = struct {
             result: SendError!usize,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
         buffer: []const u8,
     ) void {
         const transfer = Completion.Transfer{
@@ -652,7 +652,7 @@ pub const IO = struct {
             result: RecvError!usize,
         ) void,
         completion: *Completion,
-        socket: os.socket_t,
+        socket: posix.socket_t,
         buffer: []u8,
     ) void {
         const transfer = Completion.Transfer{
@@ -751,7 +751,7 @@ pub const IO = struct {
         SystemResources,
         Unseekable,
         ConnectionTimedOut,
-    } || os.UnexpectedError;
+    } || posix.UnexpectedError;
 
     pub fn read(
         self: *IO,
@@ -826,7 +826,7 @@ pub const IO = struct {
                 fn do_operation(ctx: Completion.Context, op: anytype) WriteError!usize {
                     // Do a synchronous write for now.
                     _ = ctx;
-                    return os.pwrite(op.fd, op.buf[0..op.len], op.offset);
+                    return posix.pwrite(op.fd, op.buf[0..op.len], op.offset);
                 }
             },
         );
@@ -856,19 +856,19 @@ pub const IO = struct {
 
                     // Check if the fd is a SOCKET by seeing if getsockopt() returns ENOTSOCK
                     // https://stackoverflow.com/a/50981652
-                    const socket: os.socket_t = @ptrCast(op.fd);
+                    const socket: posix.socket_t = @ptrCast(op.fd);
                     getsockoptError(socket) catch |err| switch (err) {
                         error.FileDescriptorNotASocket => return os.windows.CloseHandle(op.fd),
                         else => {},
                     };
 
-                    os.closeSocket(socket);
+                    posix.close(socket);
                 }
             },
         );
     }
 
-    pub const TimeoutError = error{Canceled} || os.UnexpectedError;
+    pub const TimeoutError = error{Canceled} || posix.UnexpectedError;
 
     pub fn timeout(
         self: *IO,
@@ -919,7 +919,7 @@ pub const IO = struct {
     pub const INVALID_SOCKET = os.windows.ws2_32.INVALID_SOCKET;
 
     /// Creates a socket that can be used for async operations with the IO instance.
-    pub fn open_socket(self: *IO, family: u32, sock_type: u32, protocol: u32) !os.socket_t {
+    pub fn open_socket(self: *IO, family: u32, sock_type: u32, protocol: u32) !posix.socket_t {
         // SOCK_NONBLOCK | SOCK_CLOEXEC
         var flags: os.windows.DWORD = 0;
         flags |= os.windows.ws2_32.WSA_FLAG_OVERLAPPED;
@@ -933,7 +933,7 @@ pub const IO = struct {
             0,
             flags,
         );
-        errdefer os.closeSocket(socket);
+        errdefer posix.close(socket);
 
         const socket_iocp = try os.windows.CreateIoCompletionPort(socket, self.iocp, 0, 0);
         assert(socket_iocp == self.iocp);
@@ -1069,7 +1069,7 @@ pub const IO = struct {
                 const write_offset = size - sector.len;
                 var written: usize = 0;
                 while (written < sector.len) {
-                    written += try os.pwrite(handle, sector[written..], write_offset + written);
+                    written += try posix.pwrite(handle, sector[written..], write_offset + written);
                 }
             };
         }
@@ -1166,13 +1166,13 @@ pub const IO = struct {
 };
 
 // TODO: use os.getsockoptError when fixed for windows in stdlib
-fn getsockoptError(socket: os.socket_t) IO.ConnectError!void {
+fn getsockoptError(socket: posix.socket_t) IO.ConnectError!void {
     var err_code: u32 = undefined;
     var size: i32 = @sizeOf(u32);
     const rc = os.windows.ws2_32.getsockopt(
         socket,
-        os.SOL.SOCKET,
-        os.SO.ERROR,
+        posix.SOL.SOCKET,
+        posix.SO.ERROR,
         std.mem.asBytes(&err_code),
         &size,
     );

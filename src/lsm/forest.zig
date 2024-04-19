@@ -75,7 +75,7 @@ pub fn ForestType(comptime _Storage: type, comptime groove_cfg: anytype) type {
 
     {
         // Verify that every tree id is unique.
-        comptime var ids: []const u16 = &.{};
+        var ids: []const u16 = &.{};
 
         inline for (std.meta.fields(_Grooves)) |groove_field| {
             const Groove = groove_field.type;
@@ -92,7 +92,7 @@ pub fn ForestType(comptime _Storage: type, comptime groove_cfg: anytype) type {
 
     const TreeInfo = struct {
         Tree: type,
-        tree_name: []const u8,
+        tree_name: [:0]const u8,
         tree_id: u16,
         groove_name: []const u8,
         groove_tree: union(enum) { objects, ids, indexes: []const u8 },
@@ -151,7 +151,8 @@ pub fn ForestType(comptime _Storage: type, comptime groove_cfg: anytype) type {
         // There are no gaps in the tree ids.
         assert(tree_infos_set.count() == tree_infos.len);
 
-        break :tree_infos tree_infos_sorted[0..];
+        const tis = tree_infos_sorted;
+        break :tree_infos tis[0..];
     };
 
     const _TreeID = comptime tree_id: {

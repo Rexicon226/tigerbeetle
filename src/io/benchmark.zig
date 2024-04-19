@@ -45,18 +45,18 @@ pub fn main() !void {
     }
 
     // Setup the server socket
-    self.server.fd = try self.io.open_socket(os.AF.INET, os.SOCK.STREAM, os.IPPROTO.TCP);
-    defer os.closeSocket(self.server.fd);
+    self.server.fd = try self.io.open_socket(os.AF.INET, posix.SOCK.STREAM, posix.IPPROTO.TCP);
+    defer posix.close(self.server.fd);
 
     const address = try std.net.Address.parseIp4("127.0.0.1", 3131);
-    try os.setsockopt(
+    try posix.setsockopt(
         self.server.fd,
-        os.SOL.SOCKET,
-        os.SO.REUSEADDR,
+        posix.SOL.SOCKET,
+        posix.SO.REUSEADDR,
         &std.mem.toBytes(@as(c_int, 1)),
     );
-    try os.bind(self.server.fd, &address.any, address.getOsSockLen());
-    try os.listen(self.server.fd, 1);
+    try posix.bind(self.server.fd, &address.any, address.getOsSockLen());
+    try posix.listen(self.server.fd, 1);
 
     // Start accepting the client
     self.io.accept(
@@ -68,8 +68,8 @@ pub fn main() !void {
     );
 
     // Setup the client connection
-    self.tx.socket.fd = try self.io.open_socket(os.AF.INET, os.SOCK.STREAM, os.IPPROTO.TCP);
-    defer os.closeSocket(self.tx.socket.fd);
+    self.tx.socket.fd = try self.io.open_socket(os.AF.INET, posix.SOCK.STREAM, posix.IPPROTO.TCP);
+    defer posix.close(self.tx.socket.fd);
 
     self.io.connect(
         *Context,
@@ -91,7 +91,7 @@ pub fn main() !void {
 
     // Close the accepted client socket.
     // The actual client socket + server socket are closed by defer
-    os.closeSocket(self.rx.socket.fd);
+    posix.close(self.rx.socket.fd);
 }
 
 const Context = struct {
@@ -102,7 +102,7 @@ const Context = struct {
     transferred: u64 = 0,
 
     const Socket = struct {
-        fd: os.socket_t = IO.INVALID_SOCKET,
+        fd: posix.socket_t = IO.INVALID_SOCKET,
         completion: IO.Completion = undefined,
     };
     const Pipe = struct {
@@ -114,7 +114,7 @@ const Context = struct {
     fn on_accept(
         self: *Context,
         completion: *IO.Completion,
-        result: IO.AcceptError!os.socket_t,
+        result: IO.AcceptError!posix.socket_t,
     ) void {
         assert(self.rx.socket.fd == IO.INVALID_SOCKET);
         assert(&self.server.completion == completion);

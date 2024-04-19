@@ -96,7 +96,7 @@ const Command = struct {
         // TODO Handle physical volumes where there is no directory to fsync.
         const dirname = std.fs.path.dirname(path) orelse ".";
         command.dir_fd = try IO.open_dir(dirname);
-        errdefer os.close(command.dir_fd);
+        errdefer posix.close(command.dir_fd);
 
         const direct_io: vsr.io.DirectIO = if (!constants.direct_io)
             .direct_io_disabled
@@ -113,7 +113,7 @@ const Command = struct {
             if (options.must_create) .create else .open,
             direct_io,
         );
-        errdefer os.close(command.fd);
+        errdefer posix.close(command.fd);
 
         command.io = try IO.init(128, 0);
         errdefer command.io.deinit();
@@ -129,8 +129,8 @@ const Command = struct {
         command.message_pool.deinit(allocator);
         command.storage.deinit();
         command.io.deinit();
-        os.close(command.fd);
-        os.close(command.dir_fd);
+        posix.close(command.fd);
+        posix.close(command.dir_fd);
     }
 
     pub fn format(
