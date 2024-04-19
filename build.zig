@@ -220,6 +220,7 @@ pub fn build(b: *std.Build) !void {
             // .main_pkg_path = .{ .path = "src" },
         });
 
+        tb_client_header.root_module.addImport("vsr", vsr_module);
         tb_client_header.root_module.addOptions("vsr_options", options);
         break :blk b.addRunArtifact(tb_client_header);
     };

@@ -553,7 +553,7 @@ pub const IO = struct {
             },
             struct {
                 fn do_operation(op: anytype) SendError!usize {
-                    return os.send(op.socket, op.buf[0..op.len], 0);
+                    return posix.send(op.socket, op.buf[0..op.len], 0);
                 }
             },
         );

@@ -31,7 +31,7 @@ pub fn main() !void {
     std.log.info("BM: branch misses/search", .{});
 
     var seed: u64 = undefined;
-    try std.os.getrandom(std.mem.asBytes(&seed));
+    try std.posix.getrandom(std.mem.asBytes(&seed));
     var prng = std.rand.DefaultPrng.init(seed);
 
     // Allocate on the heap just once.

@@ -1063,7 +1063,7 @@ pub const IO = struct {
                 log.info("opening block device \"{s}\"...", .{relative_path});
             },
             .file => {
-                var direct_io_supported = false;
+                // var direct_io_supported = false;
                 const dir_on_tmpfs = try fs_is_tmpfs(dir_fd);
 
                 if (dir_on_tmpfs) {
@@ -1077,25 +1077,25 @@ pub const IO = struct {
                 // here (see below) but being able to benchmark production workloads
                 // on tmpfs is very useful for removing
                 // disk speed from the equation.
-                if (direct_io != .direct_io_disabled and !dir_on_tmpfs) {
-                    direct_io_supported = try fs_supports_direct_io(dir_fd);
-                    if (direct_io_supported) {
-                        flags.DIRECT = true;
-                    } else if (direct_io == .direct_io_optional) {
-                        log.warn("This file system does not support Direct I/O.", .{});
-                    } else {
-                        assert(direct_io == .direct_io_required);
-                        // We require Direct I/O for safety to handle fsync failure correctly, and
-                        // therefore panic in production if it is not supported.
-                        log.err("This file system does not support Direct I/O.", .{});
-                        log.err("TigerBeetle uses Direct I/O to bypass the kernel page cache, " ++
-                            "to ensure that data is durable when writes complete.", .{});
-                        log.err("If this is a production replica, Direct I/O is required.", .{});
-                        log.err("If this is a development/testing replica, " ++
-                            "re-run with --development set to bypass this error.", .{});
-                        @panic("file system does not support Direct I/O");
-                    }
-                }
+                // if (direct_io != .direct_io_disabled and !dir_on_tmpfs) {
+                //     direct_io_supported = try fs_supports_direct_io(dir_fd);
+                //     if (direct_io_supported) {
+                //         flags.DIRECT = true;
+                //     } else if (direct_io == .direct_io_optional) {
+                //         log.warn("This file system does not support Direct I/O.", .{});
+                //     } else {
+                //         assert(direct_io == .direct_io_required);
+                //         // We require Direct I/O for safety to handle fsync failure correctly, and
+                //         // therefore panic in production if it is not supported.
+                //         log.err("This file system does not support Direct I/O.", .{});
+                //         log.err("TigerBeetle uses Direct I/O to bypass the kernel page cache, " ++
+                //             "to ensure that data is durable when writes complete.", .{});
+                //         log.err("If this is a production replica, Direct I/O is required.", .{});
+                //         log.err("If this is a development/testing replica, " ++
+                //             "re-run with --development set to bypass this error.", .{});
+                //         @panic("file system does not support Direct I/O");
+                //     }
+                // }
 
                 switch (method) {
                     .create => {

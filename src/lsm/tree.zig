@@ -617,6 +617,6 @@ test "TreeType" {
         .secondary_index,
     );
 
-    const Storage = @import("../storage.zig").Storage;
+    const Storage = @import("../Storage.zig");
     std.testing.refAllDecls(TreeType(Table, Storage));
 }

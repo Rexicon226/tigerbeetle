@@ -12,7 +12,7 @@ const IO = @import("io.zig").IO;
 const MessagePool = vsr.message_pool.MessagePool;
 const Message = MessagePool.Message;
 const MessageBus = vsr.message_bus.MessageBusClient;
-const Storage = vsr.storage.Storage;
+const Storage = vsr.Storage;
 const StateMachine = vsr.state_machine.StateMachineType(Storage, constants.state_machine_config);
 
 const Header = vsr.Header;
@@ -138,7 +138,7 @@ pub const AOF = struct {
         const fd = try IO.open_file(dir_fd, relative_path, 0, .create_or_open, .direct_io_required);
         errdefer posix.close(fd);
 
-        try os.lseek_END(fd, 0);
+        try posix.lseek_END(fd, 0);
 
         return AOF{ .fd = fd };
     }
@@ -178,7 +178,7 @@ pub const AOF = struct {
         // by signals, and a single write supports up to 0x7ffff000 bytes, which is
         // much greater than the size of our struct could ever be. Zig handles EINTR
         // for us automatically.
-        const bytes_written = try os.write(self.fd, bytes[0..disk_size]);
+        const bytes_written = try posix.write(self.fd, bytes[0..disk_size]);
 
         assert(bytes_written == disk_size);
     }

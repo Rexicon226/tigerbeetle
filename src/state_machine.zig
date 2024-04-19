@@ -2476,7 +2476,7 @@ fn check(test_table: []const u8) !void {
 
             .tick => |ticks| {
                 assert(ticks.value != 0);
-                const interval_ns: u64 = std.math.absCast(ticks.value) *
+                const interval_ns: u64 = @abs(ticks.value) *
                     switch (ticks.unit) {
                     .seconds => std.time.ns_per_s,
                 };
@@ -3623,7 +3623,7 @@ test "StateMachine: Demuxer" {
 }
 
 test "StateMachine: ref all decls" {
-    const Storage = @import("storage.zig").Storage;
+    const Storage = @import("Storage.zig");
     const StateMachine = StateMachineType(Storage, .{
         .message_body_size_max = 1000 * @sizeOf(Account),
         .lsm_batch_multiple = 1,

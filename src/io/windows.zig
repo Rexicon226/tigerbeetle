@@ -306,7 +306,7 @@ pub const IO = struct {
                         INVALID_SOCKET => blk: {
                             // Create the socket that will be used for accept.
                             op.client_socket = ctx.io.open_socket(
-                                os.AF.INET,
+                                posix.AF.INET,
                                 posix.SOCK.STREAM,
                                 posix.IPPROTO.TCP,
                             ) catch |err| switch (err) {

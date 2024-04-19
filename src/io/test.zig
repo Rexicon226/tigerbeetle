@@ -445,10 +445,10 @@ test "tick to wait" {
             self.received = true;
         }
 
-        // TODO: use os.send() instead when it gets fixed for windows
+        // TODO: use posix.send() instead when it gets fixed for windows
         fn os_send(sock: posix.socket_t, buf: []const u8, flags: u32) !usize {
             if (builtin.target.os.tag != .windows) {
-                return os.send(sock, buf, flags);
+                return posix.send(sock, buf, flags);
             }
 
             const rc = os.windows.sendto(sock, buf.ptr, buf.len, flags, null, 0);
@@ -523,7 +523,7 @@ test "pipe data over socket" {
             };
             defer self.io.deinit();
 
-            self.server.fd = try self.io.open_socket(os.AF.INET, posix.SOCK.STREAM, posix.IPPROTO.TCP);
+            self.server.fd = try self.io.open_socket(posix.AF.INET, posix.SOCK.STREAM, posix.IPPROTO.TCP);
             defer posix.close(self.server.fd);
 
             const address = try std.net.Address.parseIp4("127.0.0.1", 0);
@@ -549,7 +549,7 @@ test "pipe data over socket" {
                 self.server.fd,
             );
 
-            self.tx.socket.fd = try self.io.open_socket(os.AF.INET, posix.SOCK.STREAM, posix.IPPROTO.TCP);
+            self.tx.socket.fd = try self.io.open_socket(posix.AF.INET, posix.SOCK.STREAM, posix.IPPROTO.TCP);
             defer posix.close(self.tx.socket.fd);
 
             self.io.connect(

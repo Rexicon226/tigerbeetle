@@ -1,17 +1,18 @@
 const std = @import("std");
-const stdx = @import("../../../stdx.zig");
 const assert = std.debug.assert;
 const testing = std.testing;
 const mem = std.mem;
 
-const constants = @import("../../../constants.zig");
-const vsr = @import("../../../vsr.zig");
+const vsr = @import("vsr");
+
+const constants = vsr.constants;
 const Header = vsr.Header;
 
-const IOPS = @import("../../../iops.zig").IOPS;
-const RingBuffer = @import("../../../ring_buffer.zig").RingBuffer;
-const MessagePool = @import("../../../message_pool.zig").MessagePool;
-const Message = @import("../../../message_pool.zig").MessagePool.Message;
+const IOPS = vsr.IOPS;
+const RingBuffer = vsr.RingBuffer;
+const MessagePool = vsr.MessagePool;
+const Message = vsr.MessagePool.Message;
+const stdx = vsr.stdx;
 
 pub fn EchoClient(comptime StateMachine_: type, comptime MessageBus: type) type {
     return struct {

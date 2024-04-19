@@ -2,7 +2,6 @@ const std = @import("std");
 const tb = @import("../../tigerbeetle.zig");
 const tb_client = @import("../c/tb_client.zig");
 
-const trait = std.meta.trait;
 const assert = std.debug.assert;
 
 const output_path = "src/clients/java/src/main/java/com/tigerbeetle/";
@@ -173,9 +172,7 @@ fn to_case(
     comptime input: []const u8,
     comptime case: enum { camel, pascal, upper },
 ) []const u8 {
-    // TODO(Zig): Cleanup when this is fixed after Zig 0.11.
-    // Without comptime blk, the compiler thinks slicing the output on return happens at runtime.
-    return comptime blk: {
+    return blk: {
         var output: [input.len]u8 = undefined;
         if (case == .upper) {
             break :blk std.ascii.upperString(output[0..], input);
@@ -194,7 +191,8 @@ fn to_case(
                 .upper => unreachable,
             };
 
-            break :blk output[0..len];
+            const out = output;
+            break :blk out[0..len];
         }
     };
 }
@@ -482,7 +480,7 @@ fn emit_batch_accessors(
         , .{});
     }
 
-    if (comptime trait.is(.Array)(field.type)) {
+    if (@typeInfo(field.type) == .Array) {
         try buffer.writer().print(
             \\    {[visibility]s}byte[] get{[property]s}() {{
             \\        return getArray(at(Struct.{[property]s}), {[array_len]d});
@@ -507,7 +505,7 @@ fn emit_batch_accessors(
             .java_type = java_type(field.type),
             .property = to_case(field.name, .pascal),
             .batch_type = batch_type(field.type),
-            .return_expression = comptime if (trait.is(.Enum)(field.type))
+            .return_expression = if (@typeInfo(field.type) == .Enum)
                 get_mapped_type_name(field.type).? ++ ".fromValue(value)"
             else
                 "value",
@@ -541,7 +539,7 @@ fn emit_batch_accessors(
         , .{});
     }
 
-    if (comptime trait.is(.Array)(field.type)) {
+    if (@typeInfo(field.type) == .Array) {
         try buffer.writer().print(
             \\    {[visibility]s}void set{[property]s}(byte[] {[param_name]s}) {{
             \\        if ({[param_name]s} == null)
@@ -571,7 +569,7 @@ fn emit_batch_accessors(
             .visibility = if (is_private or is_read_only) "" else "public ",
             .batch_type = batch_type(field.type),
             .java_type = java_type(field.type),
-            .value_expression = if (comptime trait.is(.Enum)(field.type))
+            .value_expression = if (@typeInfo(field.type) == .Enum)
                 ".value"
             else
                 "",

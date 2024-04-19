@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const IO = @import("../../../io.zig").IO;
 
 const os = std.os;
+const posix = std.posix;
 const assert = std.debug.assert;
 const Atomic = std.atomic.Atomic;
 
@@ -32,7 +33,7 @@ pub const Signal = struct {
     pub fn init(self: *Signal, io: *IO, on_signal_fn: *const fn (*Signal) void) !void {
         self.io = io;
         self.server_socket = posix.socket(
-            os.AF.INET,
+            posix.AF.INET,
             posix.SOCK.STREAM | posix.SOCK.NONBLOCK,
             posix.IPPROTO.TCP,
         ) catch |err| {
@@ -92,7 +93,7 @@ pub const Signal = struct {
         };
 
         self.connect_socket = self.io.open_socket(
-            os.AF.INET,
+            posix.AF.INET,
             posix.SOCK.STREAM,
             posix.IPPROTO.TCP,
         ) catch |err| {
@@ -189,9 +190,9 @@ pub const Signal = struct {
         assert(self.accept_socket != IO.INVALID_SOCKET);
         self.send_buffer[0] = 0;
 
-        // TODO: use os.send() instead when it gets fixed for windows
+        // TODO: use posix.send() instead when it gets fixed for windows
         if (builtin.target.os.tag != .windows) {
-            _ = os.send(self.accept_socket, &self.send_buffer, 0) catch unreachable;
+            _ = posix.send(self.accept_socket, &self.send_buffer, 0) catch unreachable;
             return;
         }
 

@@ -279,7 +279,7 @@ pub fn CompactionType(
                 comptime _: []const u8,
                 _: std.fmt.FormatOptions,
                 writer: anytype,
-            ) std.os.WriteError!void {
+            ) std.posix.WriteError!void {
                 return writer.print("Position{{ .index_block = {}, " ++
                     ".value_block = {}, .value_block_index = {} }}", .{
                     self.index_block,

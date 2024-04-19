@@ -1,5 +1,6 @@
 const std = @import("std");
-const tb = @import("../../tigerbeetle.zig");
+const vsr = @import("vsr");
+const tb = vsr.tigerbeetle;
 const tb_client = @import("tb_client.zig");
 
 const type_mappings = .{
@@ -69,7 +70,8 @@ fn to_uppercase(comptime input: []const u8) []const u8 {
         char.* = input[i];
         char.* -= 32 * @as(u8, @intFromBool(char.* >= 'a' and char.* <= 'z'));
     }
-    return &output;
+    const out = output;
+    return &out;
 }
 
 fn emit_enum(
